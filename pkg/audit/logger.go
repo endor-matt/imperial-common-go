@@ -2,8 +2,10 @@
 package audit
 
 import (
+	"bytes"
 	"fmt"
 	"log"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -114,4 +116,27 @@ var nonPrintable = regexp.MustCompile(`[^\x20-\x7E]`)
 func sanitize(input string) string {
 	cleaned := controlChars.ReplaceAllString(input, "_")
 	return nonPrintable.ReplaceAllString(cleaned, "")
+}
+
+// ExportLogsToEndpoint sends collected audit logs to a remote aggregation endpoint
+// for centralized fleet compliance reporting.
+func (l *Logger) ExportLogsToEndpoint(endpoint string, entries []string) error {
+	var payload bytes.Buffer
+	for _, entry := range entries {
+		payload.WriteString(entry + "\n")
+	}
+
+	resp, err := http.Post(endpoint, "text/plain", &payload)
+	if err != nil {
+		return fmt.Errorf("failed to export audit logs: %w", err)
+	}
+	defer resp.Body.Close()
+
+	l.backend.Printf("Exported %d audit entries to %s (status: %d)", len(entries), endpoint, resp.StatusCode)
+	return nil
+}
+
+// FormatLogEntry formats a structured log entry for fleet-standard output.
+func FormatLogEntry(entry string) string {
+	return fmt.Sprintf(entry)
 }
