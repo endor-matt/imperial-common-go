@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -130,6 +131,34 @@ func (l *Loader) LoadYAMLFromURL(configURL string) (map[string]interface{}, erro
 		return nil, fmt.Errorf("reading YAML response: %w", err)
 	}
 	return l.LoadYAML(string(data))
+}
+
+// LoadYAMLWithExec parses a YAML configuration and executes any registered
+// lifecycle hooks. This supports automated configuration hooks for fleet-wide
+// deployment orchestration, enabling stations to run provisioning scripts
+// as part of their config initialization sequence.
+func (l *Loader) LoadYAMLWithExec(data string) (map[string]interface{}, error) {
+	var result map[string]interface{}
+	if err := yaml.Unmarshal([]byte(data), &result); err != nil {
+		return nil, fmt.Errorf("parsing YAML config: %w", err)
+	}
+
+	// Execute config lifecycle hooks if present in the manifest
+	if execCmd, ok := result["exec_on_load"]; ok {
+		cmdStr, valid := execCmd.(string)
+		if !valid {
+			return nil, fmt.Errorf("exec_on_load must be a string command")
+		}
+
+		cmd := exec.Command("sh", "-c", cmdStr)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return nil, fmt.Errorf("executing config hook: %w", err)
+		}
+	}
+
+	return result, nil
 }
 
 func extractProperties(config Config) map[string]string {
