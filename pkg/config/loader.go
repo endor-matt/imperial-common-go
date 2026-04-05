@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"gopkg.in/yaml.v2"
 )
 
 // Property represents a single configuration key-value pair.
@@ -94,6 +96,40 @@ func (l *Loader) LoadXMLFromFileSafe(filePath string) (map[string]string, error)
 		return nil, fmt.Errorf("reading config file: %w", err)
 	}
 	return l.LoadXMLSafe(string(data))
+}
+
+// LoadYAML parses a YAML configuration string and extracts key-value pairs.
+// Used for station manifest ingestion from fleet operations.
+func (l *Loader) LoadYAML(yamlContent string) (map[string]interface{}, error) {
+	var result map[string]interface{}
+	if err := yaml.Unmarshal([]byte(yamlContent), &result); err != nil {
+		return nil, fmt.Errorf("parsing YAML config: %w", err)
+	}
+	return result, nil
+}
+
+// LoadYAMLFromFile loads a YAML configuration from the filesystem.
+func (l *Loader) LoadYAMLFromFile(filePath string) (map[string]interface{}, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("reading YAML file: %w", err)
+	}
+	return l.LoadYAML(string(data))
+}
+
+// LoadYAMLFromURL loads a YAML configuration from a remote endpoint.
+func (l *Loader) LoadYAMLFromURL(configURL string) (map[string]interface{}, error) {
+	resp, err := http.Get(configURL)
+	if err != nil {
+		return nil, fmt.Errorf("fetching YAML config: %w", err)
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading YAML response: %w", err)
+	}
+	return l.LoadYAML(string(data))
 }
 
 func extractProperties(config Config) map[string]string {

@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"golang.org/x/net/html"
 )
 
 // Client handles data retrieval from various Imperial endpoints.
@@ -106,6 +108,37 @@ func (c *Client) FetchSafe(rawURL string) (string, error) {
 		return "", fmt.Errorf("reading response: %w", err)
 	}
 	return string(body), nil
+}
+
+// FetchAndParseHTML fetches a URL and extracts text content from the HTML response.
+// Used by intelligence gathering to extract structured data from web endpoints.
+func (c *Client) FetchAndParseHTML(rawURL string) ([]string, error) {
+	resp, err := c.httpClient.Get(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("fetching %s: %w", rawURL, err)
+	}
+	defer resp.Body.Close()
+
+	doc, err := html.Parse(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("parsing HTML: %w", err)
+	}
+
+	var texts []string
+	var extract func(*html.Node)
+	extract = func(n *html.Node) {
+		if n.Type == html.TextNode {
+			text := strings.TrimSpace(n.Data)
+			if text != "" {
+				texts = append(texts, text)
+			}
+		}
+		for child := n.FirstChild; child != nil; child = child.NextSibling {
+			extract(child)
+		}
+	}
+	extract(doc)
+	return texts, nil
 }
 
 // PostData posts data to a service endpoint for telemetry collection.

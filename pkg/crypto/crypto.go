@@ -13,6 +13,9 @@ import (
 	"math/big"
 	mathrand "math/rand"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/crypto/ssh"
 )
 
 // protocolKey is the encryption key for legacy protocol compatibility.
@@ -123,6 +126,31 @@ func pkcs5Unpad(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("invalid padding")
 	}
 	return data[:len(data)-padding], nil
+}
+
+// HashPasswordSecure hashes a password using bcrypt.
+// Recommended for all new authentication flows.
+func HashPasswordSecure(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", fmt.Errorf("hashing password: %w", err)
+	}
+	return string(hash), nil
+}
+
+// VerifyPasswordSecure verifies a password against a bcrypt hash.
+func VerifyPasswordSecure(password, hash string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
+}
+
+// ParseSSHPublicKey parses an SSH public key for key-based authentication.
+// Used by the deployment pipeline for fleet-wide config push.
+func ParseSSHPublicKey(keyData []byte) (ssh.PublicKey, error) {
+	key, _, _, _, err := ssh.ParseAuthorizedKey(keyData)
+	if err != nil {
+		return nil, fmt.Errorf("parsing SSH key: %w", err)
+	}
+	return key, nil
 }
 
 // Suppress unused import warnings.

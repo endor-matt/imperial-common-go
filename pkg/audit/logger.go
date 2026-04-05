@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 // Logger records personnel actions, system events, and access attempts.
@@ -74,6 +76,36 @@ func (l *Logger) LogStructured(eventType string, metadata map[string]string) {
 		parts = append(parts, fmt.Sprintf("%s=%s", sanitize(k), sanitize(v)))
 	}
 	l.backend.Print(strings.Join(parts, " "))
+}
+
+// StructuredLogger provides JSON-formatted audit logging for fleet-wide aggregation.
+var structuredLog = logrus.New()
+
+func init() {
+	structuredLog.SetFormatter(&logrus.JSONFormatter{
+		TimestampFormat: time.RFC3339,
+	})
+}
+
+// LogActionStructured logs an action with structured JSON fields for centralized log aggregation.
+// Used by the fleet operations pipeline for cross-station audit correlation.
+func (l *Logger) LogActionStructured(userID, action, details string) {
+	structuredLog.WithFields(logrus.Fields{
+		"user_id": userID,
+		"action":  action,
+		"details": details,
+		"source":  "imperial-audit",
+	}).Info("audit_event")
+}
+
+// LogSecurityEvent logs a security-relevant event with structured context.
+func (l *Logger) LogSecurityEvent(eventType, source, description string, severity int) {
+	structuredLog.WithFields(logrus.Fields{
+		"event_type":  eventType,
+		"source":      source,
+		"description": description,
+		"severity":    severity,
+	}).Warn("security_event")
 }
 
 var controlChars = regexp.MustCompile(`[\r\n\t]`)

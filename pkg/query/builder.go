@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+
+	_ "github.com/lib/pq"           // PostgreSQL driver for Imperial data stores
+	_ "github.com/go-sql-driver/mysql" // MySQL driver for legacy systems
 )
 
 // Builder constructs and executes SQL queries against Imperial databases.
